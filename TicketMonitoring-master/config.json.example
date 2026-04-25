@@ -1,0 +1,30 @@
+{
+  "_comment_proxy": "频繁请求用代理，格式 {\"http\":\"http://host:port\",\"https\":\"http://host:port\"}；不用填 null",
+  "proxy": null,
+
+  "token": {
+    "_comment": "抓包获取，见 ../抓包指南.md",
+    "my": "在此填入猫眼小程序抓到的 token",
+    "pxq": "在此填入票星球 token（可选）"
+  },
+
+  "monitor_list": [
+    {
+      "_comment": "platform: 0=大麦 1=猫眼 2=纷玩岛 3=票星球",
+      "show_id": "1234567",
+      "show_name": "示例演出（请替换）",
+      "platform": 1,
+      "deadline": "2026-12-31 23:59:59"
+    }
+  ],
+
+  "notice": {
+    "_comment_email": "QQ 邮箱需要 SMTP 授权码而非登录密码，在 QQ 邮箱设置里开",
+    "email": "you@qq.com",
+    "SMTP": "QQ 邮箱授权码",
+    "interval_sec": 60,
+
+    "_comment_bark": "Bark key 是 iOS App Bark 给出的 URL 最后一段；可配多个",
+    "bark_keys": []
+  }
+}

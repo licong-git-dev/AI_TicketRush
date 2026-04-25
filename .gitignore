@@ -1,0 +1,34 @@
+# 真实 token / cookie / 收件邮箱密码——永远不提交
+TicketMonitoring-master/config.json
+mobile_termux/config.json
+
+# 抓票运行期日志
+*.log
+grab.log
+抢票日志_*.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Playwright / 浏览器自动化缓存
+auth.json
+storage_state.json
+cookies.json
+.playwright/
+
+# 构建产物
+*.apk
+bin/
+build/
+dist/
