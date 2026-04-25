@@ -56,7 +56,14 @@ class MY(Monitor):
         for session in self.show_info.get("session_info", []):
             session_id = session.get("session_id")
             response = self.request(f"https://wx.maoyan.com/my/odea/show/tickets?token={self.token}&showId={session_id}&projectId={show_id}&clientPlatform=2")
-            tickets = response.json().get("data", {}).get("ticketsVO", [])
+            payload = response.json() if response.status_code == 200 else {}
+            data = payload.get("data") or {}
+            if not isinstance(data, dict) or "ticketsVO" not in data:
+                # token 失效 / 接口变更 / 风控 → 抛出，让 start.py 捕获并告警
+                raise RuntimeError(
+                    f"猫眼接口异常 status={response.status_code} resp={str(payload)[:200]}"
+                )
+            tickets = data.get("ticketsVO", [])
             can_buy_list.extend(ticket.get("ticketId") for ticket in tickets if ticket.get("remainingStock"))
         return can_buy_list
 
