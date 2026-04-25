@@ -1,0 +1,25 @@
+services:
+  ticket-monitor:
+    build: .
+    image: ticketrush/monitor:latest
+    container_name: ticket-monitor
+    restart: unless-stopped
+    # 把 config.json 从宿主挂进去，token 改了无需重 build
+    volumes:
+      - ./config.json:/app/config.json:ro
+    # 日志收集（按需开启）
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # 网络敏感操作建议跑在国内出口，能极大降低延迟
+    network_mode: bridge
+
+# 用法：
+#   1. 先运行：python3 setup_wizard.py 生成 config.json
+#   2. docker compose up -d --build
+#   3. docker compose logs -f          # 看实时日志
+#   4. 自检：docker compose exec ticket-monitor python selftest.py
+#   5. 重启：docker compose restart
+#   6. 停止：docker compose down

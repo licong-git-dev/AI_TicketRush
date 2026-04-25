@@ -91,16 +91,32 @@ def add_show(existing: list) -> dict:
 
 
 def collect_telegram() -> dict:
-    print("\n— Telegram 配置（推荐：实时推送，跨平台） —")
-    print("  申请 bot：在 Telegram 找 @BotFather → /newbot → 拿 bot_token")
-    print("  拿 chat_id：和你的 bot 发一条消息，然后访问")
-    print("    https://api.telegram.org/bot<BOT_TOKEN>/getUpdates")
-    print("  里面 message.chat.id 就是你的 chat_id\n")
-    if not ask_yes("现在配 Telegram？", True):
+    print("\n— Telegram（实时推送，跨平台；国内需梯子） —")
+    print("  Telegram 找 @BotFather → /newbot → 拿 bot_token")
+    print("  和 bot 发一条消息后访问：https://api.telegram.org/bot<TOKEN>/getUpdates")
+    print("  里面 message.chat.id 就是 chat_id\n")
+    if not ask_yes("配 Telegram？", False):
         return {"bot_token": "", "chat_ids": []}
     bot = ask("bot_token")
-    chat = ask("chat_id（多个用逗号分隔）")
+    chat = ask("chat_id（多个逗号分隔）")
     return {"bot_token": bot, "chat_ids": [c.strip() for c in chat.split(",") if c.strip()]}
+
+
+def collect_serverchan() -> dict:
+    print("\n— Server 酱 Turbo（推荐国内：微信扫码即拿 SendKey） —")
+    print("  访问 https://sct.ftqq.com 微信登录，复制 SendKey（SCT 开头）\n")
+    if not ask_yes("配 Server 酱？", True):
+        return {"send_keys": []}
+    keys = ask("SendKey（多个逗号分隔）")
+    return {"send_keys": [k.strip() for k in keys.split(",") if k.strip()]}
+
+
+def collect_feishu() -> list:
+    print("\n— 飞书自定义机器人（团队场景；可跳过） —")
+    if not ask_yes("配飞书 webhook？", False):
+        return []
+    urls = ask("webhook URL（多个逗号分隔）")
+    return [u.strip() for u in urls.split(",") if u.strip()]
 
 
 def collect_email() -> dict:
@@ -154,6 +170,8 @@ def main():
 
     notice = {
         "telegram": collect_telegram(),
+        "serverchan": collect_serverchan(),
+        "feishu_webhooks": collect_feishu(),
         "bark_keys": collect_bark(),
     }
     notice.update(collect_email())

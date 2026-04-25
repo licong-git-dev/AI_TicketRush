@@ -46,13 +46,19 @@ class FWD(Monitor):
         show_id = self.show_info.get('show_id')
         if not self.show_start:
             response = self.request(f'https://api.livelab.com.cn/performance/app/project/countDown?projectId={show_id}')
+            if response.status_code != 200:
+                raise RuntimeError(f"纷玩岛 countDown 接口异常 status={response.status_code}")
             if response.json().get("data", 0) > 0:
                 return can_buy_list
             self.show_start = True
         response = self.request(f'https://api.livelab.com.cn/performance/app/project/get_performs?project_id={show_id}&v=1694683437294&retry=false')
+        if response.status_code != 200:
+            raise RuntimeError(f"纷玩岛 get_performs 异常 status={response.status_code}")
         show_info = response.json()
-        if show_info.get("code") != 10000:
-            return can_buy_list
+        code = show_info.get("code")
+        if code != 10000:
+            # 401/40x 通常是 Bearer 过期
+            raise RuntimeError(f"纷玩岛接口返回 code={code} msg={str(show_info)[:200]}（authorization 可能过期）")
         for session_info in show_info.get("data", {}).get("performInfos", []):
             seat_plans = session_info.get("performInfo", [])[0].get("seatPlans", [])
             can_buy_list.extend(

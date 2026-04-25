@@ -57,11 +57,20 @@ class DM(Monitor):
         for session in self.show_info["session_info"]:
             session_id = session.get("session_id")
             response = self.request(self.seat_url(show_id, session_id))
-            show_session_info = self.get_data_from_response(response, session_id)
-            for seat in show_session_info.get("perform").get("skuList"):
-                if seat.get("skuSalable") == "false":
-                    continue
-                can_buy_list.append(seat.get("skuId"))
+            try:
+                show_session_info = self.get_data_from_response(response, session_id)
+                perform = show_session_info.get("perform")
+                if not perform or "skuList" not in perform:
+                    raise RuntimeError(
+                        f"大麦响应缺 perform.skuList，多半是 cookie 过期。"
+                        f"resp 摘要={str(response.json())[:200]}"
+                    )
+                for seat in perform["skuList"]:
+                    if seat.get("skuSalable") == "false":
+                        continue
+                    can_buy_list.append(seat.get("skuId"))
+            except (KeyError, AttributeError, TypeError) as e:
+                raise RuntimeError(f"大麦解析失败：{e}（cookie/sign 可能过期，见 抓包指南.md §2）")
         return can_buy_list
 
     def get_data_from_response(self, response, ext="show"):

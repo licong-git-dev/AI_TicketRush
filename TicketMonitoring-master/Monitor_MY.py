@@ -31,7 +31,14 @@ class MY(Monitor):
     def get_show_infos(self):
         show_id = self.show_info.get('show_id')
         response = requests.post(f"https://wx.maoyan.com/my/odea/project/shows?token={self.token}&clientPlatform=2", json={"projectId":show_id}, headers=MY.headers(), proxies=self._proxy)
+        if response.status_code != 200:
+            raise RuntimeError(f"猫眼加载失败 status={response.status_code}（token 或 show_id 无效）")
         show_info = response.json().get("data")
+        if not show_info or "showListVO" not in show_info:
+            raise RuntimeError(
+                f"猫眼加载失败：响应缺 showListVO。token={self.token[:8]}… show_id={show_id} "
+                f"resp={str(response.json())[:200]}（最常见原因：token 过期）"
+            )
         for session in show_info.get("showListVO"):
             session_id = session.get("showId")
             session_name = session.get("showName")

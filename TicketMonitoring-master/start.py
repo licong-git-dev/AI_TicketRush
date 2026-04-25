@@ -22,6 +22,7 @@ from Monitor_MY import MY
 from Monitor_PXQ import PXQ
 from email_notifier import EmailNotifier
 from telegram_notifier import TelegramNotifier
+from serverchan_notifier import ServerChanNotifier, FeishuNotifier
 
 
 PLATFORM_MAP = {0: ("大麦", DM), 1: ("猫眼", MY), 2: ("纷玩岛", FWD), 3: ("票星球", PXQ)}
@@ -76,6 +77,8 @@ class Runner:
             self.cfg = json.load(f)
         self.email_notifier = EmailNotifier()
         self.telegram_notifier = TelegramNotifier()
+        self.serverchan_notifier = ServerChanNotifier()
+        self.feishu_notifier = FeishuNotifier()
         self.threadPool = ThreadPoolExecutor(max_workers=20, thread_name_prefix="ticket_monitor_")
         self.stats: dict[str, Stats] = {}
         self._stop = False
@@ -99,17 +102,43 @@ class Runner:
                 stats.failures += 1
                 stats.last_error = str(e)[:200]
                 logging.error(f"❌ 自检失败：{stats.platform} {stats.show_name} → {stats.last_error}")
-        # Telegram 通道自检
-        tg_err = self.telegram_notifier.healthcheck()
-        if self.telegram_notifier.enabled:
-            if tg_err:
-                logging.warning(f"⚠️  Telegram 通道异常：{tg_err}")
+        # 通知通道自检
+        channels_active = []
+        for name, n in [
+            ("Telegram", self.telegram_notifier),
+            ("Server 酱", self.serverchan_notifier),
+            ("飞书", self.feishu_notifier),
+        ]:
+            if not n.enabled:
+                continue
+            err = n.healthcheck()
+            if err and err != "未配置":
+                logging.warning(f"⚠️  {name} 通道异常：{err}")
             else:
-                logging.info("✅ Telegram 通道就绪")
-                self.telegram_notifier.send("🚀 TicketRush 监控启动")
+                logging.info(f"✅ {name} 通道就绪")
+                channels_active.append(name)
+        if self.email_notifier.config.get("notice", {}).get("email"):
+            channels_active.append("邮件")
+        if not channels_active:
+            logging.error("⛔ 没有任何通知通道可用，回流告警将丢失！至少配置一个：Telegram / Server 酱 / 飞书 / 邮件")
         else:
-            logging.warning("⚠️  Telegram 未配置，回流推送会比较慢")
+            self._broadcast(f"🚀 TicketRush 监控启动 · 通道：{'+'.join(channels_active)}")
         return ok_total > 0
+
+    def _broadcast(self, text: str):
+        """所有可用通道一起发"""
+        try:
+            self.telegram_notifier.send(text)
+        except Exception as e:
+            logging.debug(f"telegram broadcast failed: {e}")
+        try:
+            self.serverchan_notifier.send("TicketRush", text)
+        except Exception as e:
+            logging.debug(f"serverchan broadcast failed: {e}")
+        try:
+            self.feishu_notifier.send(text)
+        except Exception as e:
+            logging.debug(f"feishu broadcast failed: {e}")
 
     # ---------- 单监控循环 ----------
     def loop_monitor(self, monitor, show: dict) -> None:
@@ -154,19 +183,31 @@ class Runner:
             f"🎫 回流啦！{stats.platform} 《{stats.show_name}》共 {len(stock)} 档可买，"
             f"立即下单：{datetime.now():%H:%M:%S}"
         )
-        # 优先 Telegram（实时）
-        if self.telegram_notifier.should_send(f"{stats.platform}_{stats.show_name}"):
-            self.telegram_notifier.send(text)
+        ident = f"{stats.platform}_{stats.show_name}"
+        # 实时通道：Telegram / Server 酱 / 飞书 全发
+        for n, label in [
+            (self.telegram_notifier, "telegram"),
+            (self.serverchan_notifier, "serverchan"),
+            (self.feishu_notifier, "feishu"),
+        ]:
+            try:
+                if n.should_send(ident):
+                    if label == "serverchan":
+                        n.send(f"回流·{stats.platform}·{stats.show_name}", text)
+                    else:
+                        n.send(text)
+            except Exception as e:
+                logging.warning(f"{label} 推送异常：{e}")
         # 邮件兜底
-        if self.email_notifier.should_send(f"{stats.platform}_{stats.show_name}"):
-            self.email_notifier.send_notification(
-                stats.show_name, f"Ticket Alert: {stats.show_name}", text
-            )
-        # Bark（如果配了）
+        if self.email_notifier.should_send(ident):
+            try:
+                self.email_notifier.send_notification(
+                    stats.show_name, f"Ticket Alert: {stats.show_name}", text
+                )
+            except Exception as e:
+                logging.warning(f"邮件推送异常：{e}")
+        # Bark（如配了）
         try:
-            for monitor_obj, _ in []:  # 不需要 monitor 引用，bark_alert 是类方法
-                pass
-            # 用 Monitor 基类的 bark_alert 静态接口
             from Monitor import Monitor as _M
             _M().bark_alert(text)
         except Exception:

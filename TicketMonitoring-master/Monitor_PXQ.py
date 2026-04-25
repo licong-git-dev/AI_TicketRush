@@ -50,21 +50,26 @@ class PXQ(Monitor):
         show_id = self.show_info.get('show_id')
 
         if not self.show_start:
-            response = self.request( f'https://m.piaoxingqiu.com/cyy_gatewayapi/show/pub/v3/show/{show_id}/sessions_dynamic_data')
+            response = self.request(f'https://m.piaoxingqiu.com/cyy_gatewayapi/show/pub/v3/show/{show_id}/sessions_dynamic_data')
+            if response.status_code != 200:
+                raise RuntimeError(f"票星球 sessions_dynamic 接口异常 status={response.status_code}")
             show_info = response.json()
-            if show_info.get("statusCode") == 200:
-                for session in show_info.get("data", {}).get("sessionVOs", []):
-                    if session.get("sessionSaleTimeCountdown", 0) > 0:
-                        return can_buy_list
-                self.show_start = True
+            if show_info.get("statusCode") != 200:
+                raise RuntimeError(f"票星球 statusCode={show_info.get('statusCode')} msg={str(show_info)[:200]}")
+            for session in show_info.get("data", {}).get("sessionVOs", []):
+                if session.get("sessionSaleTimeCountdown", 0) > 0:
+                    return can_buy_list
+            self.show_start = True
         for session in self.show_info.get("session_info"):
             session_id = session.get("session_id")
             response = self.request(f'https://m.piaoxingqiu.com/cyy_gatewayapi/show/pub/v3/show/{show_id}/show_session/{session_id}/seat_plans_dynamic_data')
-            if response.json().get("statusCode") == 200:
-                can_buy_list.extend(
-                    seat.get("seatPlanId") for seat in response.json().get("data", {}).get("seatPlans", [])
-                    if seat.get("canBuyCount", 0) > 0
-                )
+            payload = response.json()
+            if payload.get("statusCode") != 200:
+                raise RuntimeError(f"票星球 seat_plans_dynamic 异常 statusCode={payload.get('statusCode')}")
+            can_buy_list.extend(
+                seat.get("seatPlanId") for seat in payload.get("data", {}).get("seatPlans", [])
+                if seat.get("canBuyCount", 0) > 0
+            )
         return can_buy_list
 
     def request(self, url: str) -> Response:

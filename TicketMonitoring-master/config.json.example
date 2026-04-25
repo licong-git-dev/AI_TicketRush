@@ -19,13 +19,20 @@
   ],
 
   "notice": {
-    "_comment_priority": "通知优先级：telegram > email > bark；至少配一个",
+    "_comment_priority": "建议至少配一个实时通道：Telegram / Server酱 / 飞书。邮件作为兜底。",
 
     "telegram": {
-      "_comment": "BotFather 申请 bot 拿 token；和 bot 发消息后从 getUpdates 取 chat_id",
+      "_comment": "国外通道；BotFather 申请 bot 拿 token；getUpdates 取 chat_id",
       "bot_token": "",
       "chat_ids": []
     },
+
+    "serverchan": {
+      "_comment": "国内推荐：sct.ftqq.com 微信扫码拿 SendKey",
+      "send_keys": []
+    },
+
+    "feishu_webhooks": [],
 
     "_comment_email": "QQ 邮箱需要 SMTP 授权码而非登录密码",
     "email": "",
