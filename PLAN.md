@@ -18,16 +18,16 @@
 
 ---
 
-## 二、三路并发架构
+## 二、两路并发 + 回流兜底
 
 | 路 | 角色 | 何时主导 | 实现 |
 |---|---|---|---|
-| **A. API 监控 + 自动下单** | 主力，负责开抢瞬间打接口 | 0–60s 黄金期 | `TicketMonitoring-master/` 改造（见三-A） |
-| **B. 手机 UI 自动化** | 接口被风控时的备份 | 0–10 分钟 | `mobile_termux/` |
-| **C. 人手浏览器 + Cookie 复用** | 兜底；解决滑块/人脸验证 | 全程 | 你 + Playwright |
-| **D. 回流票监控** | 没抢到时持续守候 | 开抢后 1 小时–开演前 | `TicketMonitoring-master/` 默认能力 |
+| **A. API 监控 + 通知** | 主力，接口层轮询库存 | 全时段 | `TicketMonitoring-master/` |
+| **B. 手机 UI 自动化** | 开抢瞬间的点击延迟最低 | 开抢 T±60s | `mobile_termux/` |
+| **C. 浏览器 + Cookie 复用** | 可选；真要做需自己写 | 按需 | 未实现，见三-C 推荐写法 |
+| **D. 回流票监控** | 没抢到时持续守候 | 开抢后–开演前 | 复用 A 路 |
 
-**关键认知**：A 路一旦能跑通，是命中率最高的。但需要抓包拿到下单接口的签名/token。
+**关键认知**：A 路门槛在抓 token（一次性），但能 7×24 跑；B 路门槛低但只能在开抢那一刻发挥作用。两路并用命中率最高。
 
 ---
 
@@ -67,12 +67,26 @@ python -m uiautomator2 init   # 第一次需要在被控手机上确认
 python termux_grabber.py
 ```
 
-### C. 浏览器 Cookie 复用
+### C. 浏览器 Cookie 复用（未实现，需自写）
 
-`pc_ticket_grabber/main.py` + `backend/automation.py` 已经有 Playwright 框架。改造点：
-- 第一次运行**手动登录** → `context.storage_state(path="auth.json")`。
-- 后续脚本 `browser_type.launch_persistent_context(..., storage_state="auth.json")` 直接复用 cookie，跳过扫码。
-- 开抢前 5 秒预热到选座/票档页，再触发提交。
+原仓库里有过 `pc_ticket_grabber/` + `backend/` 两份 Playwright 半成品，已清理掉——它们都没做 cookie 持久化，而且 selector 绑死在已过期的周杰伦武汉站。如果你真要上 C 路，写新的，30 行足够：
+
+```python
+# 第一次运行：手动扫码登录，保存登录态
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    ctx = p.chromium.launch(headless=False).new_context()
+    page = ctx.new_page()
+    page.goto("https://passport.maoyan.com/pc/login")
+    input("扫码登录完成后回车…")
+    ctx.storage_state(path="auth.json")
+
+# 抢票时：复用登录态
+ctx = p.chromium.launch(headless=False).new_context(storage_state="auth.json")
+# 开抢前 5 秒预热到选座/票档页，倒计时结束瞬间点提交
+```
+
+`auth.json` 已在 `.gitignore` 里，不会误提交。
 
 ### D. 回流票（最重要的兜底）
 
@@ -133,13 +147,11 @@ python3 start.py
 TicketRush/
 ├── README.md                 # 项目说明
 ├── PLAN.md                   # ← 你现在看的这份
-├── TicketMonitoring-master/  # 【主力】4 平台 API 监控（开箱即用）
+├── 抓包指南.md                # 4 平台 token/cookie 抓取
+├── TicketMonitoring-master/  # 【A 路 · 主力】4 平台 API 监控
 ├── mobile_termux/            # 【B 路】手机端 uiautomator2
-├── mobile_ticket_grabber/    # 【备份】Appium 控制 PC 端连手机
-├── pc_ticket_grabber/        # 【C 路】Playwright 浏览器自动化
-├── backend/                  # FastAPI 骨架（可选，给 C 路加 Web 控制台用）
-├── 截图/                      # 猫眼界面参考图（识别按钮文字时对照）
-└── 周杰伦演唱会-武汉站-猫眼APP界面.jpg
+├── 截图/                      # 猫眼票档页参考图
+└── 周杰伦演唱会-武汉站-猫眼APP界面.jpg  # 猫眼倒计时弹窗参考图
 ```
 
 ---
